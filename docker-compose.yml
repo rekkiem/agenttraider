@@ -1,0 +1,69 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────
+# AgentTrader CL — Docker Compose
+# Deploy: docker compose up -d
+# Logs:   docker compose logs -f agent
+# ─────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL + TimescaleDB ────────────────────────────────────────
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: agenttrader_db
+    environment:
+      POSTGRES_DB:       agenttrader
+      POSTGRES_USER:     trader
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trader -d agenttrader"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Agente Principal ────────────────────────────────────────────────
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agenttrader_agent
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST:              postgres
+      DB_PORT:              5432
+      DB_NAME:              agenttrader
+      DB_USER:              trader
+      DB_PASSWORD:          ${DB_PASSWORD}
+      GMAIL_USER:           ${GMAIL_USER}
+      GMAIL_APP_PASS:       ${GMAIL_APP_PASS}
+      ALERT_EMAIL:          ${ALERT_EMAIL:-perfumes.arhom@gmail.com}
+      PORTFOLIO_VALUE_CLP:  ${PORTFOLIO_VALUE_CLP:-10000000}
+    volumes:
+      - ./saved_models:/app/saved_models    # Persistir modelos entrenados
+      - ./logs:/app/logs                    # Logs del agente
+    restart: unless-stopped
+    command: python main.py --mode scheduler
+
+  # ── Adminer (UI para explorar la DB) ─── SOLO DESARROLLO ───────────
+  # Comenta este servicio en producción
+  adminer:
+    image: adminer:4.8.1
+    container_name: agenttrader_adminer
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local

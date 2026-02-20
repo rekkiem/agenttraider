@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────────────────────────────
+# AgentTrader CL — .gitignore
+# NUNCA subir .env ni modelos entrenados a git
+# ─────────────────────────────────────────────────────────────────────
+
+# Entorno y secretos
+.env
+*.env
+
+# Modelos entrenados (pueden ser grandes)
+saved_models/
+*.pkl
+*.joblib
+
+# Logs
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtualenvs
+venv/
+.venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Datos temporales
+data/raw/
+data/cache/
