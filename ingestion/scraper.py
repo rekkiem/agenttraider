@@ -5,8 +5,11 @@ Scraper principal de Mercados en Línea (Inversiones Security)
 """
 
 import asyncio
+import os
 import psycopg2
+import psycopg2.extras
 import pandas as pd
+import numpy as np
 import yfinance as yf
 from datetime import datetime, timedelta
 from loguru import logger
@@ -106,6 +109,42 @@ def scrape_sync() -> pd.DataFrame:
     return asyncio.run(scrape_security_market())
 
 
+def _generate_synthetic_history(ticker: str, period: str = "2y") -> pd.DataFrame:
+    """
+    Genera una serie OHLCV sintética determinística para modo offline.
+    Se usa solo cuando no hay conectividad externa y está habilitado
+    AGENTTRADER_ENABLE_SYNTHETIC_DATA.
+    """
+    period_map = {"6mo": 126, "1y": 252, "2y": 504, "3y": 756, "5y": 1260}
+    sessions = period_map.get(period, 504)
+
+    seed = abs(hash(ticker)) % (2**32)
+    rng = np.random.default_rng(seed)
+
+    dates = pd.bdate_range(end=datetime.now().date(), periods=sessions, name="date")
+    base_price = 50 + (seed % 3000)
+
+    drift = rng.normal(0.0003, 0.0002, sessions)
+    shock = rng.normal(0.0, 0.018, sessions)
+    returns = drift + shock
+
+    close = base_price * np.exp(np.cumsum(returns))
+    open_ = close * (1 + rng.normal(0.0, 0.004, sessions))
+    high = np.maximum(open_, close) * (1 + np.abs(rng.normal(0.0025, 0.002, sessions)))
+    low = np.minimum(open_, close) * (1 - np.abs(rng.normal(0.0025, 0.002, sessions)))
+    volume = rng.integers(120_000, 1_500_000, sessions)
+
+    df = pd.DataFrame({
+        "open": open_,
+        "high": high,
+        "low": low,
+        "close": close,
+        "volume": volume,
+    }, index=dates)
+
+    return df
+
+
 # ── DATOS HISTÓRICOS (yfinance fallback) ──────────────────────────────
 
 def get_historical_data(ticker: str, period: str = "2y") -> pd.DataFrame:
@@ -147,6 +186,11 @@ def get_historical_data(ticker: str, period: str = "2y") -> pd.DataFrame:
 
     except Exception as e:
         logger.error(f"Error descargando {ticker} ({yf_ticker}): {e}")
+        if os.getenv("AGENTTRADER_ENABLE_SYNTHETIC_DATA", "1").lower() in ("1", "true", "yes"):
+            logger.warning(
+                f"{ticker}: usando serie sintética offline (AGENTTRADER_ENABLE_SYNTHETIC_DATA=1)"
+            )
+            return _generate_synthetic_history(ticker, period)
         return pd.DataFrame()
 
 
