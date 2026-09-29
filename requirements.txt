@@ -3,14 +3,16 @@
 
 # ── Core ──────────────────────────────────────────────────────────────
 python-dotenv==1.0.1
+requests>=2.31.0                 # Sesión HTTP con headers para yfinance
 
 # ── Data ──────────────────────────────────────────────────────────────
 pandas==2.2.2
 numpy==1.26.4
 yfinance==0.2.40
+pandas-datareader>=0.10.0        # Fuente alternativa Stooq (más robusta)
 
 # ── Scraping ──────────────────────────────────────────────────────────
-playwright==1.51.0 
+playwright==1.51.0
 beautifulsoup4==4.12.3
 
 # ── Machine Learning ──────────────────────────────────────────────────
